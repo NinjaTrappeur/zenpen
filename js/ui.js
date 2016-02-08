@@ -167,7 +167,11 @@ ZenPen.ui = (function() {
 
 	function saveText( event ) {
 
-		if (typeof saveFormat != 'undefined' && saveFormat != '') {
+        if (saveFormat == 'pdf') {
+            console.log(textToWrite);
+            pdfMake.createPdf({content:textToWrite}).download();
+        }
+        else if (typeof saveFormat != 'undefined' && saveFormat != '') {
 			var blob = new Blob([textToWrite], {type: "text/plain;charset=utf-8"});
 			/* remove tabs and line breaks from header */
 			var headerText = header.innerHTML.replace(/(\t|\n|\r)/gm,"");
@@ -283,10 +287,30 @@ ZenPen.ui = (function() {
 
 	}
 
+	function transformToJSON(text){
+        var textObject = {};
+        var tmp = document.createElement('div');
+		tmp.innerHTML = text;
+        textObject.text = tmp.textContent;
+        return textObject;
+	}
+
 	function formatText( type, header, body ) {
 		
 		var text;
 		switch( type ) {
+
+            case 'pdf':
+                text = header + body;
+                text = text
+                    .split('\n')
+                    //Let's filter empty lines
+                    .map(function(elem){return elem.trim().replace(/<p>|<\/p>/gi,"")})
+					.map(transformToJSON)
+                    .filter(function(e){if(e.text!==''){return e.text;}})
+                    //Let's trim every string
+                console.log('AFTER', text);
+                break;
 
 			case 'html':
 				header = "<h1>" + header + "</h1>";
@@ -298,9 +322,9 @@ ZenPen.ui = (function() {
 				header = header.replace(/\t/g, '');
 				header = header.replace(/\n$/, '');
 				header = "#" + header + "#";
-			
+
 				text = body.replace(/\t/g, '');
-			
+
 				text = text.replace(/<b>|<\/b>/g,"**")
 					.replace(/\r\n+|\r+|\n+|\t+/ig,"")
 					.replace(/<i>|<\/i>/g,"_")
@@ -308,37 +332,37 @@ ZenPen.ui = (function() {
 					.replace(/<\/blockquote>/g,"")
 					.replace(/<p>|<\/p>/gi,"\n")
 					.replace(/<br>/g,"\n");
-				
+
 				var links = text.match(/<a href="(.+)">(.+)<\/a>/gi);
-				
+
                                 if (links !== null) {
                                         for ( var i = 0; i<links.length; i++ ) {
                                                 var tmpparent = document.createElement('div');
                                                 tmpparent.innerHTML = links[i];
-                                                
+
                                                 var tmp = tmpparent.firstChild;
-                                                
+
                                                 var href = tmp.getAttribute('href');
                                                 var linktext = tmp.textContent || tmp.innerText || "";
-                                                
+
                                                 text = text.replace(links[i],'['+linktext+']('+href+')');
                                         }
                                 }
-				
+
 				text = header +"\n\n"+ text;
 			break;
 
 			case 'plain':
 				header = header.replace(/\t/g, '');
-			
+
 				var tmp = document.createElement('div');
 				tmp.innerHTML = body;
 				text = tmp.textContent || tmp.innerText || "";
-				
+
 				text = text.replace(/\t/g, '')
 					.replace(/\n{3}/g,"\n")
 					.replace(/\n/,""); //replace the opening line break
-				
+
 				text = header + text;
 			break;
 			default:

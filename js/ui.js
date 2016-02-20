@@ -57,7 +57,7 @@ ZenPen.ui = (function() {
 	}
 
 	function saveState() {
-
+		console.log("caramba");
 		if ( ZenPen.util.supportsHtmlStorage() ) {
 			localStorage[ 'darkLayout' ] = darkLayout;
 			localStorage[ 'wordCount' ] = wordCountElement.value;
@@ -287,28 +287,51 @@ ZenPen.ui = (function() {
 
 	}
 
-	function transformToJSON(text){
+	function formatInlineTags(text, tagName, tagStyleName){
+		if(text.indexOf('<'+ tagName +'>') > -1) {
+			text = text.split('<'+ tagName +'>')
+				.map(function (elem) {
+					if(elem.indexOf('</' + tagName + '>') > -1) {
+						elem = elem.split('</'+ tagName +'>');
+						return [{text:elem[0], style:tagStyleName}, {text:elem[1]}];
+					} else {
+						return [{text:elem}];
+					}})
+				.reduce(function(a,b){return a.concat(b);},[])
+				.filter(function(elem){if(elem.text != "") return elem;});
+		}
+		return text;
+	}
+
+	function formatBlockQuote(text){
+		return {text:text, style:'blockquote'};
+	}
+
+	function transformToPDFReadyJSON(text){
         var textObject = {};
-        var tmp = document.createElement('div');
-		tmp.innerHTML = text;
-        textObject.text = tmp.textContent;
-        return textObject;
+        textObject.content = text
+            .split('\n')
+			//Nesting content into a {text:} object
+			.map(function(elem){return {text:elem}})
+			//Flattening the list
+			.reduce(function(a,b){return a.concat(b);},[])
+			.map(function(elem){return elem.text.split('<p>')})
+			.reduce(function(a,b){return a.concat(b);},[])
+			.map(function(elem){return {text:elem.replace('</p>','')}})
+			.map(function(elem){return {text:formatInlineTags(elem.text, 'b','bold')}})
+			.map(function(elem){return {text:formatInlineTags(elem.text,'i' ,'italic')}})
+			//Let's filter empty elems
+			.filter(function(elem){if(elem.text != '') return true;});
+		return textObject;
 	}
 
 	function formatText( type, header, body ) {
 		
 		var text;
+		console.log(header + body);
 		switch( type ) {
-
             case 'pdf':
-                text = header + body;
-                text = text
-                    .split('\n')
-                    //Let's filter empty lines
-                    .map(function(elem){return elem.trim().replace(/<p>|<\/p>/gi,"")})
-					.map(transformToJSON)
-                    .filter(function(e){if(e.text!==''){return e.text;}})
-                    //Let's trim every string
+                text = transformToPDFReadyJSON(header + body);
                 console.log('AFTER', text);
                 break;
 
@@ -394,7 +417,9 @@ ZenPen.ui = (function() {
 	}
 
 	return {
-		init: init
+		init: init,
+		api: {__testonly__: {transformToPDFReadyJSON:transformToPDFReadyJSON,
+			formatInlineTags:formatInlineTags, formatBlockQuote:formatBlockQuote}}
 	}
 
 })();
